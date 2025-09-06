@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dawon Jung · MovieLand</title>
+  <style>
+    :root{
+      --fg:#0b0b0b;           /* modal 내부 기본 글자색(검정) */
+      --fg-dim:#666666;       /* 보조 텍스트 */
+      --stage-fg:#ededed;     /* 메인 스테이지(커튼) 글자색 */
+      --accent:#f7d046;       /* 포인트 노란색 */
+      --backdrop:rgba(0,0,0,.6);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body {
+      margin:0;
+      font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      background:#000;
+      color:var(--stage-fg);
+      overflow-x:hidden;
+    }
+
+    /* ===== Stage ===== */
+    .stage{position:relative;min-height:100vh;display:grid;place-items:center}
+    .curtain{position:absolute;inset:0;background:#000 center/cover no-repeat;filter:contrast(1.2)}
+    .grain:before{content:"";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(transparent, rgba(0,0,0,.6));}
+    .title{position:relative;width:min(1200px,90vw);max-width:1200px;z-index:1}
+    .title img{width:100%;height:auto;display:block;filter:drop-shadow(0 8px 20px rgba(0,0,0,.7))}
+    .footer{position:absolute;top:1.6rem;left:50%;transform:translateX(-50%);font-size:13px;color:#bdbdbd; opacity: 60%;}
+
+    .menu{position:absolute;bottom:6vh;left:50%;transform:translateX(-50%);display:flex;gap:min(8vw,80px);z-index:2}
+    .menu .btn{appearance:none;background:none;border:none;color:#aaa;font-size:18px;letter-spacing:.2px;cursor:pointer;padding:.2rem 0;}
+    .menu .btn:hover,
+    .menu .btn:focus {color: #fff; outline: none;}
+
+    /* ===== Overlay / Panel ===== */
+    .overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:var(--backdrop);backdrop-filter:blur(4px);z-index:30}
+    .overlay.show{display:flex;animation:fadeIn .18s ease-out}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+    /* Panel: white, tiny radius, no gradients or lines */
+    .panel{background:#fff;color:var(--fg);width:min(1100px,92vw);height:min(80vh,860px);
+      border-radius:5px;box-shadow:0 20px 120px rgba(0,0,0,.6);display:grid;grid-template-rows:auto 1fr;
+      overflow:hidden; min-height: 0}
+
+    /* Header: title left, controls right */
+    .panel-header {
+      display: flex;
+      justify-content: space-between; /* 좌측-우측 끝으로 배치 */
+      align-items: center;
+      padding: 12px 16px;
+    }
+    .panel-title {
+      font-weight: 700;
+      margin: 0; /* 혹시 기본 마진 제거 */
+    }
+    .panel-actions {
+      display: flex;
+      gap: 16px; /* 버튼 간격 */
+    }
+
+    /* text-only buttons inside modal */
+    .text-btn{appearance:none;background:none;border:none;padding:0;margin-left:16px;color:var(--fg);font-size:14px;font-weight:600;cursor:pointer}
+    .text-btn:first-child{margin-left:0}
+    .text-btn:hover,.text-btn:focus{color:var(--accent);outline:none}
+
+    /* Cover Letter */
+    .cover{display:grid;grid-template-columns:300px 1fr;height:100%; min-height: 0}
+    .cover-nav{overflow:auto;padding:24px}
+    .ep{display:block;width:100%;text-align:left;background:none;border:none;color:var(--fg);padding:.55rem .2rem;border-radius:6px;cursor:pointer;font-size:15px}
+    .ep:hover,.ep:focus{color:var(--accent);outline:none}
+    .ep.active{font-weight:700}
+
+    .cover-content{overflow:auto;padding-top:24px; padding-left:24px; padding-right:240px; padding-bottom:96px; height: 100%; min-height: 0;
+      hyphens: none;       /* 모든 브라우저 공통 */
+      -webkit-hyphens: none; /* Safari, iOS */
+      -ms-hyphens: none;     /* 구형 IE */
+      word-break: keep-all;
+    } 
+    .cover-content h2{margin:.2rem 0 2rem 0;}
+    .cover-content h3{margin:5rem 0 1.2rem 0;}
+    .meta{font-size:13px;color:var(--fg-dim);margin-bottom:1rem}
+    .cover-content p{line-height:1.75;color:var(--fg);}
+    .cover-content ul{line-height:1.75}
+    /* 팝업 본문 링크 공통 스타일 */
+    .cover-content a {
+      color: #624d1f;           /* 기본: 검정 */
+      text-decoration: none;    /* 밑줄 제거 */
+      border-bottom: 1px solid transparent; /* 미세한 인터랙션용 */
+      transition: color .2s ease, border-color .2s ease;
+      word-break: break-word;   /* 긴 URL 줄바꿈 */
+    }
+
+    /* 방문한 링크(선택) */
+    .cover-content a:visited {
+      color: #333;              /* 살짝 어둡게 (원치 않으면 삭제) */
+    }
+
+    /* 호버/포커스 상태 */
+    .cover-content a:hover,
+    .cover-content a:focus {
+      color: var(--accent);     /* 노란색 */
+      border-bottom-color: var(--accent);  /* 밑줄 대신 얇은 보더 */
+      outline: none;            /* 기본 파란 아웃라인 제거 */
+    }
+
+    /* Resume preview */
+    .resume-box{
+      display:grid;
+      grid-template-rows:1fr auto;
+      gap:10px;
+      height:100%;
+      min-height:0;          /* 🔸그리드 자식이 줄어들 수 있게 */
+    }
+
+    .resume-view{
+      /* place-items:center;  <-- 제거 */
+      display:flex;          /* 가운데 정렬은 flex로 */
+      justify-content:center;
+      align-items:flex-start;/* 위쪽부터 시작(세로 스크롤 자연스럽게) */
+      overflow:auto;         /* 🔸스크롤 발생 */
+      scrollbar-gutter: stable; /* 맥에서 스크롤 공간 고정 (선택) */
+      padding:10px;
+      height:100%;
+      min-height:0;          /* 🔸스크롤 되도록 */
+    }
+
+    .resume-view img{
+      display:block;
+      width:800px;          /* 큰 폭 → 필요시 숫자 조절 */
+      height:auto;
+      max-width:none;        /* 🔸부모 너비에 맞춰 줄어들지 않게 */
+      border-radius:4px;
+    }
+
+
+    /* Portfolio PDF */
+    .pdf-box{height:100%}
+    .pdf-obj{width:100%;height:100%;border:0}
+    .fallback{display:grid;place-items:center;gap:10px;height:100%;padding:20px;text-align:center}
+
+    @media (max-width:700px){
+      .cover{grid-template-columns:1fr}
+      .cover-nav{display:flex;gap:10px;overflow:auto}
+      .ep{white-space:nowrap}
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <div class="curtain grain" style="background-image:url('./IMG/background.png')"></div>
+    <div class="footer">© 2025 Dawon Jung · Designed for MovieLand Application</div>
+
+    <nav class="menu" aria-label="primary">
+      <button class="btn" id="openResume">Resume</button>
+      <button class="btn" id="openCover">Cover Letter</button>
+      <button class="btn" id="openPortfolio">Portfolio</button>
+    </nav>
+  </main>
+
+  <!-- Cover Letter Panel -->
+  <section class="overlay" id="coverLayer" aria-hidden="true" aria-label="Cover Letter">
+    <article class="panel" role="dialog" aria-modal="true">
+      <header class="panel-header">
+        <div class="panel-title">Cover Letter</div>
+        <div class="panel-actions">
+          <button class="text-btn" id="dlCover">Download (PDF)</button>
+        </div>
+      </header>
+      <div class="cover">
+        <aside class="cover-nav" id="epList">
+          <button class="ep" data-ep="1">ep.1 세상을 다정하게 바라보는 시선</button>
+          <button class="ep" data-ep="2">ep.2 무비랜드와의 만남</button>
+          <button class="ep" data-ep="3">ep.3 디자인이 현실이 되는 순간</button>
+          <button class="ep" data-ep="4">ep.4 영화와 사람을 잇는 현장에서의 배움</button>
+          <button class="ep" data-ep="5">ep.5 함께일 때 더욱 특별해지는 사람</button>
+          <button class="ep" data-ep="6">ep.6 위기를 기회로</button>
+        </aside>
+        <section class="cover-content" id="epBody"></section>
+      </div>
+    </article>
+  </section>
+
+  <!-- Resume Modal -->
+  <section class="overlay" id="resumeLayer" aria-hidden="true" aria-label="Resume preview">
+    <article class="panel" role="dialog" aria-modal="true">
+      <header class="panel-header">
+        <div class="panel-title">Resume</div>
+        <div class="panel-actions">
+          <button class="text-btn" id="dlResume">Download (PDF)</button>
+        </div>
+      </header>
+      <div class="resume-box">
+        <div class="resume-view">
+          <img id="resumePreview" src="./Application/resume.png" alt="Resume preview"/>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <!-- Portfolio Modal -->
+  <section class="overlay" id="portfolioLayer" aria-hidden="true" aria-label="Portfolio">
+    <article class="panel" role="dialog" aria-modal="true">
+      <header class="panel-header">
+        <div class="panel-title">Portfolio</div>
+        <div class="panel-actions">
+          <button class="text-btn" id="dlPortfolio">Download (PDF)</button>
+        </div>
+      </header>
+      <div class="pdf-box">
+        <object id="portfolioObj" class="pdf-obj" type="application/pdf" data="./Application/portfolio.pdf">
+          <div class="fallback">
+            <p>브라우저에서 PDF 임베드가 차단되었어요. 아래 버튼으로 새 탭에서 열어주세요.</p>
+            <a class="text-btn" id="openPortfolioNew" href="./Application/portfolio.pdf" target="_blank" rel="noopener">Open in new tab</a>
+          </div>
+        </object>
+      </div>
+    </article>
+  </section>
+
+
+  <script>
+    // ===== Paths =====
+    const PATHS = {
+      resumePDF: './Application/resume.pdf',
+      coverPDF: './Application/coverletter.pdf',
+      portfolioPDF: './Application/portfolio.pdf'
+    };
+
+    // ===== Helpers =====
+    const $ = (s, el=document) => el.querySelector(s);
+    const $$ = (s, el=document) => [...el.querySelectorAll(s)];
+    const open = el => { el.classList.add('show'); el.setAttribute('aria-hidden','false'); };
+    const close = el => { el.classList.remove('show'); el.setAttribute('aria-hidden','true'); };
+
+    // 새 탭 열기 헬퍼
+    const openNewTab = (url) => window.open(url, '_blank', 'noopener');
+
+    // ===== Bindings =====
+    const resumeLayer = $('#resumeLayer');
+    const coverLayer = $('#coverLayer');
+    const portfolioLayer = $('#portfolioLayer');
+
+    // Cover: 열리면 ep.1 바로 로드
+    $('#openCover').addEventListener('click', ()=>{
+      open(coverLayer);
+      activateEp(1);
+      history.pushState({panel:'cover', ep:1},'', '#cover-ep1');
+    });
+
+    // ✅ Resume: 모달만 열기 (자동 다운로드/열기 없음)
+    $('#openResume').addEventListener('click', ()=>{
+      open(resumeLayer);
+      history.pushState({panel:'resume'},'', '#resume');
+    });
+
+    // Portfolio: 기존 동작 유지 (필요시 동일 패턴으로 변경 가능)
+    $('#openPortfolio').addEventListener('click', ()=>{
+      open(portfolioLayer);
+      history.pushState({panel:'portfolio'},'', '#portfolio');
+    });
+
+    // 외곽 클릭/ESC 닫기
+    $$('.overlay').forEach(ov=> ov.addEventListener('click', e=> { if(e.target===ov) close(ov); }));
+    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ $$('.overlay.show').forEach(close) } });
+
+    // ===== Cover Letter EP loader =====
+    const epBody = $('#epBody');
+    const epList = $('#epList');
+    const EP = {
+      1: `<h2>ep.1 세상을 다정하게 바라보는 시선</h2>
+          <img src="./IMG/1.jpg" style="width:500px; height:auto;">
+          <p>저는 세상 속 작은 것들까지 소중하게 바라보려 하는 사람입니다. 누군가에게는 하찮아 보일 수 있는 것에서도 의미를 발견하고, 
+            그 속에서 즐거움을 찾습니다. 그래서 저는 쓸모없다고 여겨지는 것조차 삶을 다채롭게 만드는 중요한 요소라고 생각합니다. 
+            일상을 이루는 작은 장면들, 그리고 스쳐 지나가는 사람들 모두가 각자의 이야기를 가진 특별한 존재라고 믿습니다.</p>
+           <p>이러한 태도는 일하는 방식에서도 드러납니다. 저는 언제나 재치를 잃지 않으려 합니다. 진지해야 할 때는 책임감을 다하지만,
+            동시에 위트와 유쾌함을 더해 함께하는 사람들이 즐겁게 몰입할 수 있는 환경을 만들고자 합니다. 리더십을 발휘해야 할 때도 카리스마와 친근함을 균형 있게 유지하며, 
+            경직되지 않고 편안한 분위기 속에서 서로의 가능성을 북돋우는 분위기를 이끌어내려 노력합니다.</p>
+           <p>이런 저의 가치관은 관객에게 단순한 영화 관람 이상의 경험을 선물하고자 하는 무비랜드의 지향점과 맞닿아 있습니다. 
+            다정한 시선과 재치 있는 태도로, 사람과 사람 사이의 만남이 따뜻한 기억으로 남을 수 있도록 기여하고 싶습니다.</p>
+          <h3>영화로 나를 표현한다면?</h3>
+          <img src="./IMG/2.jpeg" style="width:500px; height:auto;">
+          <p>『에브리씽 에브리웨어 올 앳 원스』는 “모두에게 다정히 대하는 것이 곧 싸우는 방식”이라는 메시지를 전합니다. 
+            저는 다정함이 단순히 따뜻함을 넘어 세상을 지탱하는 강한 힘이라고 믿습니다. 그래서 사람을 대할 때, 그리고 디자인을 할 때도 늘 
+            다정한 시선과 유쾌한 위트를 담고자 합니다. 무겁지 않으면서도 누구에게나 열려 있는 태도, 그것이 제가 지향하는 모습입니다.</p>
+          <img src="./IMG/3.jpg" style="width:500px; height:auto; margin-top:1.5rem">
+          <p>『로봇 드림』은 이별을 새로운 시작과 추억의 다른 이름으로 보여줍니다. 이별 후에도 함께했던 순간은 영원히 사라지지 않고 여전히 
+            의미 있게 남는다는 영화의 메시지에 깊이 공감했습니다. 저 또한 관계와 경험을 오래도록 소중히 간직하며, 끝을 두려워하기보다는 
+            그 과정을 감사히 받아들이려는 태도를 가지고 있습니다. 그래서 저는 새로운 사람이나 프로젝트를 만날 때에도 그 경험이 제게 오랜 
+            시간 남겨줄 잔상을 상상하며 최선을 다해 임하는 편입니다.
+          </p>
+            `,
+      2: `<h2>ep.2 무비랜드와의 만남</h2>
+      <p>저는 영화를 감상하는 행위뿐 아니라 영화를 보러 가는 과정, 그리고 영화를 틀어주는 공간에서만 느낄 수 있는 특별한 경험을 사랑합니다. 
+        소극장, 대형 극장을 가리지 않고 영화를 찾아다니는 것도 같은 이유에서입니다.</p>
+       <img src="./IMG/4.jpg" style="width:600px; height:auto;">
+      <p>박시영 디자이너가 큐레이터였던 시기, 빔 벤더스 감독의 <텍사스, 파리>를 관람하러 <a href="https://www.behance.net/7a515899" target="_blank">무비랜드에 처음 방문했을 때</a> 무비랜드만의 특별함을 또렷하게 느꼈습니다. 
+        처음으로 혼자 방문해 어색하게 공간을 둘러보고 있던 제게 먼저 다가와 첫 방문인지 묻고 굿즈를 설명해주시던 스태프 분의 응대는 
+        직원과 손님의 관계를 넘어 ‘사람 대 사람’으로 소통한다는 느낌을 주었습니다. 관객 경험을 세심하게 고려한 1~3층의 공간 구성도 인상적이었고,
+        상영 직전 “쓰레기는 자리에 두고 가셔도 된다”는 안내 멘트조차 무비랜드다운 위트로 다가왔습니다. 관람했던 영화 자체도 좋았지만, 
+        공간에서 느꼈던 영화 외의 경험들 덕분에 무비랜드의 방문이 제게 더욱 특별한 기억으로 자리잡았습니다.</p>
+      <p>저는 사람을 만나고 소통하는 일을 좋아합니다. 현장에서 사람을 맞이하고, 그들이 경험할 순간을 함께 만들어가는 과정에서 큰 보람을 느낍니다. 
+        무비랜드가 운영진 스스로 디자인과 공간, 고객 경험까지 연결하는 방식은 제가 바라는 디자이너의 태도와 닮아 있습니다. 
+        앞으로 무비랜드를 찾게 될 관객들도 제가 느꼈던 따뜻한 순간을 마주할 수 있도록 무비랜드와 함께하고 싶습니다.</p>
+          
+      `,
+      3: `<h2>ep.3 디자인이 현실이 되는 순간</h2>
+        <img src="./IMG/5.jpeg" style="width:600px; height:auto;">
+        <p>저는 주니어 디자이너임에도 불구하고 실제 관객과 사용자가 있는 프로젝트에 다수 참여해왔습니다. 예술가들이 모이는 네트워킹 행사의 아이덴티티 
+          디자인과 진행을 맡았고, GV나 뮤지션의 공연 등 다양한 인디팬던트 문화를 접목해 관객에게 특별한 경험을 선사하는 독립영화 상영회의 
+          운영과 디자인을 총괄했습니다. 
+          </p>
+        <img src="./IMG/7.png" style="width:600px; height:auto;margin-top:1.5rem">
+          <img src="./IMG/8-2.jpeg" style="width:300px; height:auto;">
+        <p>더불어 기업 사내 카페에서 실제 진열·설치되는 그래픽 작업을 담당하며, 제 디자인이 현실의 공간 속에서 어떻게 기능하는지 직접 확인했습니다. 
+          이 과정에서 디자이너뿐 아니라 다양한 사람들과 미팅을 하며 소통하고, 발주 경험을 쌓았습니다. 무엇보다 제 작업이 누군가의 경험으로 이어진다는 
+          사실이 주는 책임감도 깊이 느낄 수 있었습니다.
+          </p>
+        <img src="./IMG/9.jpeg" style="width:600px; height:auto;margin-top:1.5rem">
+        <p>또한 저는 활동적인 성향 덕분에 디자인뿐 아니라 현장 진행과 운영 업무에 참여한 경험이 많습니다. 독립영화 상영회에서는 관객 응대와 현장 통솔을 
+          맡았고, 소모임 활동에서는 외부 워크숍을 기획·진행하며 참가자들과 직접 소통했습니다. 단순히 디자인을 만드는 것에서 그치지 않고 현장에서
+           사람들을 직접 만나며 경험을 완성해온 덕분에 운영과 소통에도 능숙한 디자이너로 성장할 수 있었습니다. 이처럼 디자인과 운영을 모두 경험하며
+           쌓아온 역량을 바탕으로, 무비랜드에서도 디자이너로서의 전문성을 발휘하는 동시에 공간과 관객을 직접 잇는 과정에 기여하고 싶습니다.
+           </P>
+        `,
+      4: `<h2>ep.4 영화와 사람을 잇는 현장에서의 배움</h2>
+          <img src="./IMG/10.jpeg" style="width:600px; height:auto; ">
+          <p>무비랜드가 추구하는 '영화 경험의 확장'에 깊이 공감합니다. 저는 올해 상반기 대학생 독립영화 상영 단체 GUJIff의 부대표로 활동하며, 
+            비극장 상영회라는 독특한 포맷의 독립영화 상영회를 총괄했습니다. GUJIff는 매 상영회 독립영화 배급사와 직접 컨택하여 행사의 콘셉트에 
+            맞는 영화를 선정하고, 독립영화를 매개로 사람들이 함께 교류하는 장을 구성합니다. 이렇게 단순한 영화 상영을 넘어 관객 경험 전체를 
+            디자인하고 운영하는 과정에서 디자인이 현장에서 어떻게 사람과 연결되는지를 체감했습니다. 그 과정에서 쌓은 경험은 무비랜드의 가치관과 
+            닮아 있습니다.
+          </p>
+          <img src="./IMG/11.png" style="width:300px; height:auto;margin-top:1.5rem;">
+          <p>그중에서도 제3회 비극장 상영회 <a href="https://www.instagram.com/p/DOA3pO1kghl/" target="_blank">〈C와 D코드〉</a>는 저의 활동을 집약적으로 보여주는 
+            프로젝트였습니다. 저는 예산 설계부터 베뉴 컨택, 뮤지션과의 미팅, 팀 간 협업까지 상영회 운영 전반을 총괄했습니다. 
+            독립영화를 더 많은 사람들에게 알리기 위해 인디 문화에서 영화와 음악의 교차 지점을 찾고, 관객이 이 교집합 속에서 즐거움을 향유하며 
+            새로운 취향을 발견하면 좋겠다는 생각에 ‘영화와 음악의 결합’이라는 새로운 형식에 도전했습니다. OTT 시대에 ‘공간’의 가치를 믿고 오프라인 
+            극장을 세운 무비랜드처럼, 저에게도 이 경험은 실험적이면서도 의미 있는 도전이었습니다.</P>
+          <p>상영회를 단순한 관람으로 끝내지 않기 위해 다양한 장치를 고민했습니다. 패들릿을 활용한 감독과 관객의 대화, 인디 뮤지션의 공연, 상영회 
+            굿즈 제작 등 영화 외적인 요소들을 결합해 이야기를 확장했습니다. 관객은 이 이 상영회를 통해 새로운 취향을 발견하고, 영화를 보는 순간을
+             넘어 더 넓은 맥락에서 상영회를 기억할 수 있었습니다.</p>
+          <img src="./IMG/G1.png" style="width:400px; height:auto;margin-top:1.5rem;">
+          <p>또한 저는 디테일이 곧 브랜드 경험을 만든다는 믿음으로 공간과 현장을 설계했습니다. 조명 세팅, 좌석 배치, 모더레이터의 멘트, 스탭의 동선까지
+             하나하나 고민하며, 작은 요소들이 모여 관객의 몰입도를 바꾼다는 사실을 실감했습니다. 디자인과 운영이 분리된 것이 아니라, 함께 어우러져
+              관객 경험을 완성한다는 점을 배웠습니다.</p>
+          <p>이 경험을 통해 저는 디자인과 기획, 운영이 결국 하나의 흐름 속에서 관객의 기억을 만들어낸다는 것을 깨달았습니다. 
+            그렇기에 무비랜드에서 주니어 디자이너로서 활동하며, 단순한 상영을 넘어 관객에게 오래 남을 경험을 디자인해 무비랜드의 세계관을 더욱 풍성하게 
+            만드는 데 기여하고 싶습니다.</p>
+        
+        `,
+      5: `<h2>ep.5 함께일 때 더욱 특별해지는 사람</h2>
+          <p>저는 여러 프로젝트에서 자연스럽게 리더 역할을 맡으며 팀의 방향을 잡고 책임지는 법을 배웠습니다. 동시에 좋은 리더십은 팔로워십에서 비롯된다는 
+            사실을 깨달았습니다. 그래서 리더가 팀을 원활히 이끌 수 있도록 든든히 지원하고, 주어진 역할을 충실히 수행하며 팀의 운영이 안정적으로 
+            이어지도록 노력하는 팔로워의 역할 또한 적극적으로 해냈습니다. 이러한 과정 덕분에 새로운 팀에 합류하더라도 언제 앞장서야 할지, 
+            언제 뒤에서 힘을 보태야 할지를 균형 있게 판단할 수 있다고 생각합니다.
+            </p>
+          <img src="./IMG/12.jpg" style="width:400px; height:auto;">
+          <p>또한 협업 과정에서는 재미와 긍정적인 에너지를 중요하게 여깁니다. 분위기를 부드럽게 만들고 팀원들이 편안하게 의견을 나눌 수 있는 환경을 
+            조성하려 노력하며, 카리스마와 위트를 상황에 맞게 발휘해 팀이 경직되지 않으면서도 목표에 집중할 수 있도록 합니다. 함께한 동료들은 
+            제가 밝은 에너지를 지니면서도 필요한 순간에는 진지함을 잃지 않고, 다른 사람의 강점을 빠르게 파악해 가능성을 끌어내는 단단한 사람이라고 
+            말해주었습니다.
+            </p>
+            `,
+      6: `<h2>ep.6 위기를 기회로</h2>
+          <p>올해 상반기, 대학생 독립영화 상영 기획 단체 GUJIff의 부대표로 활동하면서 겪었던 어려움과 그것을 해결한 과정이 가장 기억에 남습니다. 
+            약 8년간의 자료가 보관된 구글 드라이브가 초기 소유자의 계정 문제로 완전히 삭제되어, 손익계산서와 활동 장부를 포함한 모든 파일이 사라진 일이었습니다. 
+            당황스러운 상황이었지만, 부대표로서 저는 먼저 불안해하는 팀원들을 안심시키고 대표의 마음을 다잡아 함께 문제를 해결하는 데 집중했습니다.
+            </p>
+          <img src="./IMG/13.png" style="width:400px; height:auto;">
+          <p>파일을 온전히 복구할 수는 없었지만, 최대한 빠르게 수습하기 위해 OB 연락망을 통해 기존 자료를 모으고, 사라진 회계 문서는 처음부터 다시 
+            제작했습니다. 동시에 공용 계정을 개설해 백업 체계를 마련하고, 복잡했던 폴더 구조를 개편해 더 효율적인 시스템을 만들었습니다. 
+            처음에는 막막했지만 차근차근 하나씩 해결해 나가니 운영에 큰 차질이 없을 정도로 상황을 정리할 수 있었습니다.
+            </p>
+          <img src="./IMG/14.png" style="width:360px; height:auto;">
+          <p>그리고 무엇보다도, 이 모든 과정은 저 혼자였다면 감당하지 못했을 일이라 생각합니다.<br>옆에서 끝까지 책임감을 가지고 함께해 준 대표 덕분에 
+            가능했고, 그 덕분에 ‘누군가와 함께한다는 사실만으로도 큰 힘이 된다’는 것을 다시 한번 깨닫게 되었습니다. 
+            이 경험은 위기를 기회로 전환하는 과정이었을 뿐 아니라, 동료와 함께하는 협력의 가치까지<br>깊이 배우게 해 준 소중한 기억으로 남아 있습니다.
+            </p>
+      `
+    };
+    const activateEp = (n)=>{
+      $$('.ep', epList).forEach(b=>b.classList.toggle('active', b.dataset.ep==n));
+      epBody.innerHTML = EP[n] || '<p>내용이 준비되지 않았습니다.</p>';
+      history.replaceState({ep:n}, '', `#cover-ep${n}`);
+    };
+    epList.addEventListener('click', (e)=>{
+      const b = e.target.closest('.ep'); if(!b) return; activateEp(b.dataset.ep);
+    });
+
+    // Hash open
+    const openFromHash = ()=>{
+      const h = location.hash;
+      if(h.startsWith('#cover-ep')){ open(coverLayer); const n = h.replace('#cover-ep',''); activateEp(n); }
+      else if(h==="#cover"){ open(coverLayer); activateEp(1); }
+      else if(h==="#resume"){ open(resumeLayer); }
+      else if(h==="#portfolio"){ open(portfolioLayer); }
+    };
+    window.addEventListener('hashchange', openFromHash);
+    openFromHash();
+
+    // ===== Downloads (버튼 눌렀을 때만 새 탭 열기) =====
+    $('#dlCover').addEventListener('click', ()=> openNewTab(PATHS.coverPDF));
+    $('#dlResume').addEventListener('click', ()=> openNewTab(PATHS.resumePDF));      // ✅ 새 탭에서 열기
+    $('#dlPortfolio').addEventListener('click', ()=> openNewTab(PATHS.portfolioPDF)); // 필요에 따라 유지/변경
+  </script>
