@@ -1,6 +1,15 @@
 <!doctype html>
 <html lang="ko">
 <head>
+  <!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-DL16K4KLXG"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-DL16K4KLXG');
+</script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dawon Jung · MovieLand</title>
@@ -381,6 +390,7 @@
             </p>
       `
     };
+    
     const activateEp = (n)=>{
       $$('.ep', epList).forEach(b=>b.classList.toggle('active', b.dataset.ep==n));
       epBody.innerHTML = EP[n] || '<p>내용이 준비되지 않았습니다.</p>';
